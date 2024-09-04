@@ -1,4 +1,4 @@
-# 学习前知识
+# 学前知识
 git bash 浏览状态 到尾部按 Q 结束</br>
 远程仓库-本地仓库-工作区</br>
                 -缓存区</br>
@@ -61,3 +61,25 @@ git pull 或 git fetch && git merge </br>
 git add . </br>
 git commit -m '备注'</br>
 git push
+
+
+## 高级操作
+
+### 仓库树操作
+git subtree
+大型项目下有多个独立项目, 可以将多个独立组件整合到一个仓库里
+例如 A仓库下有 前端 后端,
+1. 添加子树：</br>
+确定要添加为子树的仓库的 URL 和路径。命令将子树添加到当前仓库 使用 </br>
+```git subtree add --prefix=<subtree_path> <repository_url> <branch_name>```</br> 
+例：</br>
+```git subtree add --prefix=projects/deep_subproject https://github.com/someuser/deep_subproject.git main``` </br>
+这将把指定仓库的指定分支作为子树添加到当前仓库的 <subtree_path> 路径下
+2. 更新子树：</br>
+当子树仓库中的代码发生变化时，可以使用</br>
+```git subtree pull --prefix=<subtree_path> <repository_url> <branch_name>``` </br>
+这将从指定仓库的指定分支拉取最新的更改并合并到子树中。
+3. 推送子树更改：</br>
+如果你在子树中进行了更改，并希望将这些更改推送到子树仓库中，可以使用 </br>
+```git subtree push --prefix=<subtree_path> <repository_url> <branch_name>```
+这将把子树中的更改推送到指定仓库的指定分支。
