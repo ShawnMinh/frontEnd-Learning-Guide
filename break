@@ -1,0 +1,45 @@
+[33mcommit 453c76cc2719f84ea1476caa1921b5c7b8d3940f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mgg[m[33m)[m
+Author: shawn <thisisming@qq.com>
+Date:   Wed Sep 4 11:36:46 2024 +0800
+
+    git2
+
+[1mdiff --git a/git.markdown b/git.markdown[m
+[1mindex 36d9f6d..6bc9cfd 100644[m
+[1m--- a/git.markdown[m
+[1m+++ b/git.markdown[m
+[36m@@ -1,17 +1,22 @@[m
+ # 学习前知识[m
+ [m
+[31m-远程仓库-本地仓库-工作区[m
+[31m-                -缓存区[m
+[31m-三种状态： 未修改 unmodified, 已修改 modified, 已暂存 staged[m
+[32m+[m[32m远程仓库-本地仓库-工作区</br>[m
+[32m+[m[32m                -缓存区</br>[m
+[32m+[m[32m三种状态：</br> 未修改 unmodified, 已修改 modified, 已暂存 staged</br>[m
+ 通过 git status 查看分支状态[m
+ [m
+ ## 起步[m
+[31m-git init 初始化本地仓库[m
+[31m-git clone xxxx 克隆到本地[m
+[32m+[m[32mgit init 初始化本地仓库</br>[m
+[32m+[m[32mgit clone xxxx 克隆到本地[m[41m [m
+ [m
+ ## 分支[m
+[31m-git branch    查看本地分支[m
+[31m-git branch -r 查看远程分支[m
+[31m-git branch -a 查看本地和远程分支[m
+[31m-git checkout branchName 切换本地分支[m
+[31m-git checkout -b branchName 创建本地分支[m
+\ No newline at end of file[m
+[32m+[m[32mgit branch    查看本地分支</br>[m
+[32m+[m[32mgit branch -r 查看远程分支</br>[m
+[32m+[m[32mgit branch -a 查看本地和远程分支</br>[m[41m [m
+[32m+[m[32mgit branch -m oldname newname 重命名分支</br>[m[41m [m
+[32m+[m[32mgit branch -d name 删除本地分支 *删除前先切换到其他分支</br>[m[41m [m
+[32m+[m[32mgit checkout name 切换本地分支 </br>[m
+[32m+[m[32mgit checkout -b name 创建本地分支 </br>[m
+[32m+[m[32mgit push origin name 远程仓库添加分支 </br>[m
+[32m+[m[32mgit merge name 将分支合并到本分支 </br>[m
+[41m+ [m
+\ No newline at end of file[m
