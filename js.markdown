@@ -693,3 +693,316 @@ class a{
 ```
 
 ## 对象和类
+* ECMA-262 将对象定义为一组属性的无序集合。严格来说，这意味着对象就是一组没有特定顺序的
+值。对象的每个属性或方法都由一个名称来标识，这个名称映射到一个值。正因为如此（以及其他还未
+讨论的原因），可以把 ECMAScript 的对象想象成一张散列表，其中的内容就是一组名/值对，值可以是
+数据或者函数
+### ECMAScript 中原型的本质
+
+```
+function Person(){} 
+let p1 = new Person
+Person.prototype.constructor == Person
+p1.constructor == Person
+p1.__proto__ == Person.prototype
+```
+ * 实例只有指向原型的指针，没有指向构造函数的指针
+
+`
+
+无论何时，只要创建一个函数，就会按照特定的规则为这个函数创建一个 prototype 属性（指向
+原型对象）。默认情况下，所有原型对象自动获得一个名为 constructor 的属性，指回与之关联的构
+造函数。对前面的例子而言，Person.prototype.constructor 指向 Person。然后，因构造函数而
+异，可能会给原型对象添加其他属性和方法。
+在自定义构造函数时，原型对象默认只会获得 constructor 属性，其他的所有方法都继承自
+Object。每次调用构造函数创建一个新实例，这个实例的内部[[Prototype]]指针就会被赋值为构
+造函数的原型对象。脚本中没有访问这个[[Prototype]]特性的标准方式，但 Firefox、Safari 和 Chrome
+会在每个对象上暴露__proto__属性，通过这个属性可以访问对象的原型。在其他实现中，这个特性
+完全被隐藏了。关键在于理解这一点：实例与构造函数原型之间有直接的联系，但实例与构造函数之
+间没有。
+`
+![alt text](/img/prototype.png)
+### 创建对象
+* 按照惯例，构造函数名称的首字母都是要大写的，非构造函数则以小写字母开头
+* 通过 new创建
+    ```
+        let person = new Object(); 
+        person.name = "Nicholas"; 
+        person.age = 29; 
+        person.job = "Software Engineer"; 
+        person.sayName = function() { 
+        console.log(this.name); 
+        };
+    ```
+* 字面量创建
+    ```
+    let person = { 
+        name: "Nicholas", 
+        age: 29, 
+        job: "Software Engineer", 
+        sayName() { 
+            console.log(this.name); 
+        } 
+    };
+     ```
+* 工厂模式
+    ```
+        function createPerson(name,gender,sayName){
+            let o = new Object()
+            o.name = name;
+            o.gender = gender;
+            o.sayName = function (){ this.name  }
+            return o
+        }
+
+    ```
+* 构造函数模式
+
+    `构造函数与普通函数唯一的区别就是调用方式不同。除此之外，构造函数也是函数。并没有把某个
+函数定义为构造函数的特殊语法。任何函数只要使用 new 操作符调用就是构造函数，而不使用 new 操
+作符调用的函数就是普通函数`
+
+    要创建 Person 的实例，应使用 new 操作符。以这种方式调用构造函数会执行如下操作。
+    * 在内存中创建一个新对象。
+    * 这个新对象内部的[[Prototype]]特性被赋值为构造函数的 prototype 属性。
+    * 构造函数内部的 this 被赋值为这个新对象（即 this 指向新对象）。
+    * 执行构造函数内部的代码（给新对象添加属性）。
+    * 如果构造函数返回非空对象，则返回该对象；否则，返回刚创建的新对象。
+    ```
+        function Person(name,gender){
+            this.name = name;
+            this.gender = gender;
+            this.sayName = function(){  console.log(this.name);  }
+        }
+    let person1 = new Person("Nicholas", 29, "Software Engineer"); 
+    let person2 = new Person("Greg", 27, "Doctor"); 
+    person1.sayName(); // Nicholas 
+    person2.sayName(); // Greg
+
+    ```
+* 原型模式
+
+    `每个函数都会创建一个 prototype 属性，这个属性是一个对象，包含应该由特定引用类型的实例
+共享的属性和方法。实际上，这个对象就是通过调用构造函数创建的对象的原型。使用原型对象的好处
+是，在它上面定义的属性和方法可以被对象实例共享。原来在构造函数中直接赋给对象实例的值，可以
+直接赋值给它们的原型`
+
+    ```
+        function Person() {} 
+        Person.prototype.name = "Nicholas"; 
+        Person.prototype.age = 29; 
+        Person.prototype.job = "Software Engineer"; 
+        Person.prototype.sayName = function() { 
+        console.log(this.name); 
+        }; 
+        let person1 = new Person(); 
+        person1.sayName(); // "Nicholas" 
+        let person2 = new Person(); 
+        person2.sayName(); // "Nicholas" 
+        console.log(person1.sayName == person2.sayName); // true
+
+    ```
+* Object.create() 创建对象
+
+### 属性
+属性分两种：数据属性和访问器属性。
+* 数据属性
+数据属性包含一个保存数据值的位置。值会从这个位置读取，也会写入到这个位置。数据属性有 4
+个特性描述它们的行为。
+    * [[Configurable]]：表示属性是否可以通过 delete 删除并重新定义，是否可以修改它的特
+    性，以及是否可以把它改为访问器属性。默认情况下，所有直接定义在对象上的属性的这个特
+    性都是 true，如前面的例子所示。
+    * [[Enumerable]]：表示属性是否可以通过 for-in 循环返回。默认情况下，所有直接定义在对
+    象上的属性的这个特性都是 true，如前面的例子所示。
+    * [[Writable]]：表示属性的值是否可以被修改。默认情况下，所有直接定义在对象上的属性的
+    这个特性都是 true，如前面的例子所示。
+    * [[Value]]：包含属性实际的值。这就是前面提到的那个读取和写入属性值的位置。这个特性
+    的默认值为 undefined。
+    * 要修改属性的默认特性，就必须使用 Object.defineProperty()方法。这个方法接收 3 个参数：
+要给其添加属性的对象、属性的名称和一个描述符对象。最后一个参数，即描述符对象上的属性可以包
+含：configurable、enumerable、writable 和 value，跟相关特性的名称一一对应。根据要修改
+的特性，可以设置其中一个或多个值
+        ```
+        let person = {}; 
+        Object.defineProperty(person, "name", { 
+            writable: false, 
+            value: "Nicholas" 
+        }); 
+        console.log(person.name); // "Nicholas" 
+        person.name = "Greg"; 
+        console.log(person.name); // "Nicholas"
+        ```
+* 访问器属性
+访问器属性不包含数据值。相反，它们包含一个获取（getter）函数和一个设置（setter）函数，不
+过这两个函数不是必需的。在读取访问器属性时，会调用获取函数，这个函数的责任就是返回一个有效
+的值。在写入访问器属性时，会调用设置函数并传入新值，这个函数必须决定对数据做出什么修改。访
+问器属性有 4 个特性描述它们的行为
+    * [[Configurable]]：表示属性是否可以通过 delete 删除并重新定义，是否可以修改它的特
+性，以及是否可以把它改为数据属性。默认情况下，所有直接定义在对象上的属性的这个特性
+都是 true。
+    * [[Enumerable]]：表示属性是否可以通过 for-in 循环返回。默认情况下，所有直接定义在对
+象上的属性的这个特性都是 true。
+    * [[Get]]：获取函数，在读取属性时调用。默认值为 undefined。
+    * [[Set]]：设置函数，在写入属性时调用。默认值为 undefined。
+    * 访问器属性是不能直接定义的，必须使用 Object.defineProperty()
+        ```
+            let book ={  year_: 2017, edition: 1  }
+            Object.defineProperty(book, "year", { 
+                get() { 
+                    return this.year_; 
+                }, 
+                set(newValue) { 
+                    if (newValue > 2017) { 
+                        this.year_ = newValue; 
+                        this.edition += newValue - 2017; 
+                    } 
+                } 
+            }); 
+            book.year = 2018; 
+            console.log(book.edition); // 2
+
+        ```
+### 定义多个属性
+* ECMAScript 提供了 Object.defineProperties()方法。这个方法可以通过多个描述符一次性定义多个属性。它接收两个参数：要为之添
+加或修改属性的对象和另一个描述符对象，其属性与要添加或修改的属性一一对应
+    ```
+        let book = {}; 
+        Object.defineProperties(book, { 
+            year_: { 
+            value: 2017 
+            }, 
+            edition: { 
+            value: 1 
+            }, 
+            year: { 
+                get() { 
+                    return this.year_; 
+                },
+                set(newVal) {
+                    return  newVal + 1
+                }
+            }
+        })
+    ```
+* 简单重写
+    ```
+        let book = {
+            value: 2017,
+            get value(){
+                return 10
+            },
+            set value(v){
+                return 999
+            }
+        }
+
+    ```
+### 获取属性描述
+* Object.getOwnPropertyDescriptor(obj,属性)
+* Object.getOwnPropertyDescriptors(obj)
+### 属性枚举顺序
+* for-in 循环、Object.keys()、Object.getOwnPropertyNames()、Object.getOwnPropertySymbols()以及 Object.assign()
+### 对象方法
+* 合并对象 Object.assign()
+    * 这个方法接收一个目标对象和一个
+或多个源对象作为参数，然后将每个源对象中可枚举（Object.propertyIsEnumerable()返回 true）
+和自有（Object.hasOwnProperty()返回 true）属性复制到目标对象。以字符串和符号为键的属性
+会被复制。对每个符合条件的属性，这个方法会使用源对象上的[[Get]]取得属性的值，然后使用目标
+对象上的[[Set]]设置属性的值。结果返回目标对象
+    * Object.assign(目标对象,...多个源对象)实际上对每个源对象执行的是浅复制。如果多个源对象都有相同的属性，则使用最后一个复制的值。此外，从源对象访问器属性取得的值，比如获取函数，会作为一个静态值赋给目标对象。换句话说，不能在两个对象间转移获取函数和设置函数。
+
+        ```
+
+        ```
+* Object.is()  增强判定方法, 相当于 === 但是更加严格 多了边界 例如 NaN 和 NaN 相等 
+### 对象解构
+* 可以提前声明解构的变量, 可以设置不存在的属性
+* 可以设置默认参数
+* 解构赋值可以使用嵌套结构，以匹配嵌套的属性
+* 可以对函数参数解构，不影响 arguments
+```
+let personName, personAge; 
+let person = { 
+    name: 'Matt', 
+    age: 27 
+}; 
+({name: personName, age: personAge, c= 999} = person); 
+console.log(personName, personAge,c); // Matt, 27, 999
+let person = { 
+ name: 'Matt', 
+ age: 27 
+}; 
+function printPerson(foo, {name, age}, bar) { 
+ console.log(arguments); 
+ console.log(name, age); 
+} 
+function printPerson2(foo, {name: personName, age: personAge}, bar) { 
+ console.log(arguments); 
+ console.log(personName, personAge); 
+} 
+printPerson('1st', person, '2nd'); 
+// ['1st', { name: 'Matt', age: 27 }, '2nd'] 
+// 'Matt', 27 
+printPerson2('1st', person, '2nd'); 
+// ['1st', { name: 'Matt', age: 27 }, '2nd'] 
+// 'Matt', 27
+```
+### 继承与原型链
+`
+* ECMA-262 把原型链定义为 ECMAScript 的主要继承方式。其基本思想就是通过原型继承多个引用
+类型的属性和方法。
+* 重温一下构造函数、原型和实例的关系：每个构造函数都有一个原型对象，原型有
+一个属性指回构造函数，而实例有一个内部指针指向原型。如果原型是另一个类型的实例呢？那就意味
+着这个原型本身有一个内部指针指向另一个原型，相应地另一个原型也有一个指针指向另一个构造函
+数。这样就在实例和原型之间构造了一条原型链。这就是原型链的基本构想。
+`
+* 任何函数的默认原型都是一个 Object 的实例，这意味着这个实例有一个内部指针指向
+Object.prototype
+
+![alt text](/img/inherit.png)
+
+```
+function Animal() {}
+Animal.prototype.run = function(){ console.log("running") }
+
+function Dog(){}
+Dog.prototype = new Animal()
+
+let dog1 = new Dog()
+dog1.run()
+
+
+```
+### 类
+* 在类块中定义的所有内容都会定义在类的原型上
+* 派生类的方法可以通过 super 关键字引用它们的原型。在类构造函数中使用 super 可以调用父类构造函数
+* 调用 super()会调用父类构造函数，并将返回的实例赋值给 this。
+* 如果在派生类中显式定义了构造函数，则要么必须在其中调用 super()，要么必须在其中返回一个对象。
+* 在类构造函数中，不能在调用 super()之前引用 this。
+### 类的继承
+* extends
+### 组合胜过继承（composition over inheritance）
+### 小结
+对象在代码执行过程中的任何时候都可以被创建和增强，具有极大的动态性，并不是严格定义的实体。下面的模式适用于创建对象。
+* 工厂模式就是一个简单的函数，这个函数可以创建对象，为它添加属性和方法，然后返回这个
+对象。这个模式在构造函数模式出现后就很少用了。
+* 使用构造函数模式可以自定义引用类型，可以使用 new 关键字像创建内置类型实例一样创建自
+定义类型的实例。不过，构造函数模式也有不足，主要是其成员无法重用，包括函数。考虑到
+函数本身是松散的、弱类型的，没有理由让函数不能在多个对象实例间共享。
+* 原型模式解决了成员共享的问题，只要是添加到构造函数 prototype 上的属性和方法就可以共享。而组合构造函数和原型模式通过构造函数定义实例属性，通过原型定义共享的属性和方法。JavaScript 的继承主要通过原型链来实现。原型链涉及把构造函数的原型赋值为另一个类型的实例。这样一来，子类就可以访问父类的所有属性和方法，就像基于类的继承那样。原型链的问题是所有继承的属性和方法都会在对象实例间共享，无法做到实例私有。盗用构造函数模式通过在子类构造函数中调用父类构造函数，可以避免这个问题。这样可以让每个实例继承的属性都是私有的，但要求类型只能通过构造函数模式来定义（因为子类不能访问父类原型上的方法）。目前最流行的继承模式是组合继承，即通过原型链继承共享的属性和方法，通过盗用构造函数继承实例属性。
+除上述模式之外，还有以下几种继承模式。
+* 原型式继承可以无须明确定义构造函数而实现继承，本质上是对给定对象执行浅复制。这种操
+作的结果之后还可以再进一步增强。
+* 与原型式继承紧密相关的是寄生式继承，即先基于一个对象创建一个新对象，然后再增强这个
+新对象，最后返回新对象。这个模式也被用在组合继承中，用于避免重复调用父类构造函数导
+致的浪费。
+* 寄生组合继承被认为是实现基于类型继承的最有效方式。
+ECMAScript 6 新增的类很大程度上是基于既有原型机制的语法糖。类的语法让开发者可以优雅地定
+义向后兼容的类，既可以继承内置类型，也可以继承自定义类型。类有效地跨越了对象实例、对象原型
+和对象类之间的鸿沟。
+## 代理和反射
+`
+ECMAScript 6 新增的代理和反射为开发者提供了拦截并向基本操作嵌入额外行为的能力。具体地
+说，可以给目标对象定义一个关联的代理对象，而这个代理对象可以作为抽象的目标对象来使用。在对
+目标对象的各种操作影响目标对象之前，可以在代理对象中对这些操作加以控制
+`
