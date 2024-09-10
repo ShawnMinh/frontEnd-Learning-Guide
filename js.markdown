@@ -1739,3 +1739,361 @@ API 对下面的代码进行重构：
      console.log(proxy.age); // 输出：35
      ```
 Reflect提供了一种更加标准化和简洁的方式来执行一些常见的对象操作和函数调用，同时也为元编程和拦截操作提供了强大的工具。
+
+## 函数
+函数实际上是对象。每个函数都是Function类型的实例，而 Function 也有属性和方法，跟其他引用类型一样。因为函数是对象，所以函数名就是指向函数对象的指针，而且不一定与函数本身紧密绑定
+
+#### 如何定义函数
+* 函数声明的方式定义
+* 函数表达式，函数表达式与函数声明几乎是等价的
+* 箭头函数
+* 构造函数
+    ```
+     函数声明
+        function sum(){}         具名函数
+        let sum = function(){}   匿名函数
+        () => {}                 箭头函数
+        let sum = new Function(arg1,arg2, "return num1 + num2")
+    ```
+不推荐使用构造函数这种语法来定义函数，因为这段代码会被解释两次：第一次是将它当作常规
+ECMAScript 代码，第二次是解释传给构造函数的字符串。这显然会影响性能。不过，把函数想象为对
+象，把函数名想象为指针是很重要的
+
+#### 箭头函数 请注意
+* 箭头函数不能使用 arguments、super 和 new.target，也不能用作构造函数。此外，箭头函数也没有 prototype 属性
+#### 函数名
+* 函数名就是指向函数的指针，所以它们跟其他包含对象指针的变量具有相同的行为
+* ECMAScript 6 的所有函数对象都会暴露一个只读的 name 属性，其中包含关于函数的信息。多数情
+况下，这个属性中保存的就是一个函数标识符，或者说是一个字符串化的变量名。即使函数没有名称，
+也会如实显示成空字符串。如果它是使用 Function 构造函数创建的，则会标识成"anonymous"
+* 如果函数是一个获取函数、设置函数，或者使用 bind()实例化，那么标识符前面会加上一个前缀
+```
+function foo() {} 
+let bar = function() {}; 
+let baz = () => {}; 
+console.log(foo.name); // foo 
+console.log(bar.name); // bar 
+console.log(baz.name); // baz 
+console.log((() => {}).name); //（空字符串）
+console.log((new Function()).name); // anonymous
+
+function foo() {} 
+console.log(foo.bind(null).name); // bound foo 
+let dog = { 
+    years: 1, 
+    get age() { 
+    return this.years; 
+ }, 
+ set age(newAge) { 
+    this.years = newAge; 
+ } 
+} 
+let propertyDescriptor = Object.getOwnPropertyDescriptor(dog, 'age'); 
+console.log(propertyDescriptor.get.name); // get age 
+console.log(propertyDescriptor.set.name); // set age
+```
+#### 参数
+ECMAScript 函数的参数在内部表现为一个数组。函数被调用时总会接
+收一个数组，但函数并不关心这个数组中包含什么。如果数组中什么也没有，那没问题；如果数组的元
+素超出了要求，那也没问题
+* ECMAScript 中的所有参数都按值传递的。不可能按引用传递参数。如果把对象作为参数传递，那么传递的值就是这个对象的引用
+* 在使用 function 关键字定义（非箭头）函数时，可以在函数内部访问 arguments 对象，从中取得传进来的每个参数值
+    * arguments 对象是一个类数组对象（但不是 Array 的实例），因此可以使用中括号语法访问其中的
+元素（第一个参数是 arguments[0]，第二个参数是 arguments[1]）。而要确定传进来多少个参数，
+可以访问 arguments.length 属性。
+        ```
+            function sum(a) {
+                arguments.length
+                argument[0]
+                argument[1]
+                a === argument[0]
+            }
+        ```
+    * arguments 对象可以跟命名参数一起使用, 可以用于实现函数重载
+        ```
+        function doAdd(num1, num2) { 
+            if (arguments.length === 1) { 
+                console.log(num1 + 10); 
+            } else if (arguments.length === 2) { 
+                console.log(arguments[0] + num2); 
+            } 
+        }
+        ```
+    * arguments的值始终会与对应的命名参数同步，始终以调用函数时传入的值为准， 如果只传了一个参数，然后把 arguments[1]设置为某个值，那么这个值并不会反映到第二个命名参数。这是因为 arguments 对象的长度是根据传入的参数个数，而非定义函数时给出的命名参数个数确定的
+* 默认参数
+    * 默认参数的一种常用方式就是检测某个参数是否等于 undefined，如果是则意味着没有传这个参数，那就给它赋一个值
+    * 函数的默认参数只有在函数被调用时才会求值，不会在函数定义时求值。而且，计算默认值的函数
+    只有在调用函数但未传相应参数时才会被调用
+    * 参数初始化顺序遵循“暂时性死区”规则，即前面定义的参数不能引用后面定义的
+        ```
+        // 调用时不传第一个参数会报错
+        function makeKing(name = numerals, numerals = 'VIII') { 
+            return `King ${name} ${numerals}`; 
+        } 
+        参数也存在于自己的作用域中，它们不能引用函数体的作用域：
+        // 调用时不传第二个参数会报错
+        function makeKing(name = 'Henry', numerals = defaultNumeral) { 
+            let defaultNumeral = 'VIII'; 
+            return `King ${name} ${numerals}`; 
+        }
+        ```
+#### 函数重载
+* ECMAScript 函数没有签名，因为参数是由包含零个或多个值的数组表示的。没有函数签名，自然也就没有重载
+* 检查参数的类型和数量，然后分别执行不同的逻辑来模拟函数重载
+#### 参数扩展与收集
+扩展操作符最有用
+的场景就是函数定义中的参数列表，在这里它可以充分利用这门语言的弱类型及参数长度可变的特点。
+扩展操作符既可以用于调用函数时传参，也可以用于定义函数参数
+* 扩展
+    ```
+        function sum() {}
+        
+        sum(...[1,2,3],4)
+        相当于
+        sum(1,2,3,4)
+
+    ```
+* 收集
+    ```
+        function sum(...args, end) {  
+            args == [1,2,3]
+            end == 4
+        }
+        
+        sum(...[1,2,3],4)
+        相当于
+        sum(1,2,3,4)
+
+    ```
+#### 函数声明与函数表达式
+JavaScript 引擎在任何代码执行之前，会先读取函数声明，并在执行上下文中
+生成函数定义。而函数表达式必须等到代码执行到它那一行，才会在执行上下文中生成函数定义
+* 函数声明会在任何代码执行之前先被读取并添加到执行上下文。这个过程叫作函数声明提升（function declaration hoisting）。在执行代码时，JavaScript 引擎会先执行一遍扫描，把发现的函数声明提升到源代码树的顶部。因此即使函数定义出现在调用它们的代码之后，引擎也会把函数声明提升到顶部
+    ```
+        // 可以提升   函数声明提升了
+        function sum(num1, num2) { 
+            return num1 + num2; 
+        }
+        // 提升的是普通变量, 不是函数声明。 会出错
+        let sum = function() {}
+
+    ```
+#### 函数作为值
+ 因为函数名在 ECMAScript 中就是变量，所以函数可以用在任何可以使用变量的地方。这意味着不
+仅可以把函数作为参数传给另一个函数，而且还可以在一个函数中返回另一个函数
+### 函数内部
+在 ECMAScript 5 中，函数内部存在两个特殊的对象：arguments 和 this。ECMAScript 6 又新增
+了 new.target 属性。
+#### arguments
+
+arguments 是一个类数组对象，包含调用函数时传入的所有参数。这
+个对象只有以 function 关键字定义函数（相对于使用箭头语法创建函数）时才会有。主要用于包
+含函数参数
+* arguments对象有arguments[0] length callee
+
+* 使用 arguments.callee 就可以让函数逻辑与函数名解耦. callee是一个指向 arguments 对象所在函数的指针
+    ```
+        function factorial(num) { 
+            if (num <= 1) { 
+                return 1; 
+            } else { 
+                return num * arguments.callee(num - 1); 
+                // 类似于  return num * factorial(num - 1);
+            } 
+        }
+        // 这个重写之后的 factorial()函数已经用 arguments.callee 代替了之前硬编码的factorial。这意味着无论函数叫什么名称，都可以引用正确的函数
+    ```
+#### this
+在标准函数中，this 引用的是把函数当成方法调用的上下文对象，这时候通常称其为 this 值
+值（在网页的全局上下文中调用函数时，this 指向 windows）。
+
+* 函数被调用时才能确定 this 到底引用哪个对象(this指向哪里)
+* 箭头函数中，this引用的是定义箭头函数的上下文
+#### caller
+这个属性引用的是调用当前函数的函数，或者如果是
+在全局作用域中调用的则为 null
+
+```
+function outer() {
+    inner(); 
+} 
+function inner() { 
+    console.log(inner.caller); 
+ // console.log(arguments.callee.caller);
+} 
+outer();
+```
+#### new.target
+
+ECMAScript 中的函数始终可以作为构造函数实例化一个新对象，也可以作为普通函数被调用。
+ECMAScript 6 新增了检测函数是否使用 new 关键字调用的 new.target 属性
+
+如果函数是正常调用的则 new.target 的值是 undefined；如果是使用 new 关键字调用的，则 new.target 将引用被调用的构造函数
+
+### 函数属性与方法
+ECMAScript 中的函数是对象，因此有属性和方法。每个函数都有两个属性：length
+和 prototype
+* length 属性保存函数定义的命名参数的个数
+* prototype 属性 是保存引用类型所有实例方法的地方，这意味着 toString()、valueOf()等方法实际上都保存在 prototype 上，进而由所有实例共享。这个属性在自定义类型时特别重要。prototype 属性是不可枚举的，因此使用 for-in 循环不会返回这个属性
+* apply()和 call() 这两个方法都会以指定的 this 值来调用函数，即会设
+置调用函数时函数体内 this 对象的值。 两者只有传参方式不同
+    * apply()方法接收两个参数： this 的值和一个参数数
+组。第二个参数可以是 Array 的实例，但也可以是 arguments 对象
+    * call(this指向, args1,args2) 方法接收多个个参数：函数内 this 的值和多个参数
+    * 使用 call()或 apply()的好处是可以将任意对象设置为任意函数的作用域，这样对象可以不用关
+心方法
+* bind()   bind()方法会创建一个新的函数实例，其 this 值会被绑定到传给 bind()的对象
+* valueOf()返回函数本身
+* toLocaleString()和 toString()始终返回函数的代码
+
+### 尾调用
+
+ECMAScript 6 规范新增了一项内存管理优化机制，让 JavaScript 引擎在满足条件时可以重用栈帧, 即 一个函数的返回值是另一个返回值时 会有性能优化, 即一个函数内部的最后一项是返回另一个函数
+```
+function outerFunction() { 
+    return innerFunction(); // 尾调用
+}
+```
+```
+// 无优化：尾调用没有返回 
+function outerFunction() { 
+    innerFunction(); 
+} 
+// 无优化：尾调用没有直接返回
+function outerFunction() { 
+    let innerFunctionResult = innerFunction(); 
+    return innerFunctionResult; 
+} 
+// 无优化：尾调用返回后必须转型为字符串
+function outerFunction() { 
+    return innerFunction().toString(); 
+} 
+// 无优化：尾调用是一个闭包
+function outerFunction() { 
+    let foo = 'bar'; 
+    function innerFunction() { return foo; } 
+    return innerFunction(); 
+} 
+下面是几个符合尾调用优化条件的例子：
+"use strict"; 
+// 有优化：栈帧销毁前执行参数计算
+function outerFunction(a, b) { 
+    return innerFunction(a + b); 
+} 
+// 有优化：初始返回值不涉及栈帧
+function outerFunction(a, b) { 
+    if (a < b) { 
+        return a; 
+    } 
+    return innerFunction(a + b); 
+} 
+// 有优化：两个内部函数都在尾部
+function outerFunction(condition) { 
+    return condition ? innerFunctionA() : innerFunctionB(); 
+}
+```
+
+在 ES6 优化之前，执行这个例子会在内存中发生如下操作。  
+    (1) 执行到 outerFunction 函数体，第一个栈帧被推到栈上。  
+    (2) 执行 outerFunction 函数体，到 return 语句。计算返回值必须先计算 innerFunction。  
+    (3) 执行到 innerFunction 函数体，第二个栈帧被推到栈上。  
+    (4) 执行 innerFunction 函数体，计算其返回值。  
+    (5) 将返回值传回 outerFunction，然后 outerFunction 再返回值。  
+    (6) 将栈帧弹出栈外。  
+在 ES6 优化之后，执行这个例子会在内存中发生如下操作。    
+    (1) 执行到 outerFunction 函数体，第一个栈帧被推到栈上。  
+    (2) 执行 outerFunction 函数体，到达 return 语句。为求值返回语句，必须先求值   innerFunction。  
+    (3) 引擎发现把第一个栈帧弹出栈外也没问题，因为 innerFunction 的返回值也是 outerFunction
+    的返回值。  
+    (4) 弹出 outerFunction 的栈帧。  
+    (5) 执行到 innerFunction 函数体，栈帧被推到栈上。  
+    (6) 执行 innerFunction 函数体，计算其返回值。  
+    (7) 将 innerFunction 的栈帧弹出栈外。  
+很明显，第一种情况下每多调用一次嵌套函数，就会多增加一个栈帧。而第二种情况下无论调用多
+少次嵌套函数，都只有一个栈帧。这就是 ES6 尾调用优化的关键：如果函数的逻辑允许基于尾调用将其
+销毁，则引擎就会那么做。
+### 闭包
+
+
+当一个内部函数在其外部函数中被定义，并可以访问外部函数的变量时，就形成了一个闭包
+```
+    function compare(value1, value2) { 
+        if (value1 < value2) { 
+            return -1; 
+        } else if (value1 > value2) { 
+            return 1; 
+        } else { 
+            return 0; 
+        } 
+    } 
+    let result = compare(5, 10);
+```
+
+
+函数执行时，每个执行上下文中都会有一个包含其中变量的对象。全局上下文中的叫变量对象，它
+会在代码执行期间始终存在。而函数局部上下文中的叫活动对象，只在函数执行期间存在。在定义
+compare()函数时，就会为它创建作用域链，预装载全局变量对象，并保存在内部的[[Scope]]中。在
+调用这个函数时，会创建相应的执行上下文，然后通过复制函数的[[Scope]]来创建其作用域链。接着
+会创建函数的活动对象（用作变量对象）并将其推入作用域链的前端。在这个例子中，这意味着 compare()
+函数执行上下文的作用域链中有两个变量对象：局部变量对象和全局变量对象。作用域链其实是一个包含指针的列表，每个指针分别指向一个变量对象，但物理上并不会包含相应的对象
+
+* 注意 this 和 arguments 都是不能直接在内部函数中访问的。如果想访问包含作用域中
+的 arguments 对象，则同样需要将其引用先保存到闭包能访问的另一个变量中
+    ```
+    window.identity = 'The Window'; 
+    let object = { 
+        identity: 'My Object', 
+        getIdentityFunc() { 
+            let that = this; 
+            return function() { 
+                return that.identity; 
+            }; 
+        } 
+    };
+    console.log(object.getIdentityFunc()()); // 'My Object'
+    ```
+### 立即调用的函数表达式
+立即调用的匿名函数又被称作立即调用的函数表达式（IIFE，Immediately Invoked Function 
+Expression）。它类似于函数声明，但由于被包含在括号中，所以会被解释为函数表达式。紧跟在第一组
+括号后面的第二组括号会立即调用前面的函数表达式
+
+使用 IIFE 可以模拟块级作用域，即在一个函数表达式内部声明变量，然后立即调用这个函数。这
+样位于函数体作用域的变量就像是在块级作用域中一样
+
+```
+// IIFE 
+(function () { 
+ for (var i = 0; i < count; i++) { 
+    console.log(i); 
+ } 
+})(); 
+console.log(i); // 抛出错误
+```
+
+在 ECMAScript 6 以后，IIFE 就没有那么必要了，因为块级作用域中的变量 let const 无须 IIFE 就可以实现同
+样的隔离
+
+### 小结
+
+函数是 JavaScript 编程中最有用也最通用的工具。ECMAScript 6 新增了更加强大的语法特性，从而
+让开发者可以更有效地使用函数。  
+* 函数表达式与函数声明是不一样的。函数声明要求写出函数名称，而函数表达式并不需要。没
+有名称的函数表达式也被称为匿名函数。
+* ES6 新增了类似于函数表达式的箭头函数语法，但两者也有一些重要区别。
+* JavaScript 中函数定义与调用时的参数极其灵活。arguments 对象，以及 ES6 新增的扩展操作符，
+可以实现函数定义和调用的完全动态化。
+* 函数内部也暴露了很多对象和引用，涵盖了函数被谁调用、使用什么调用，以及调用时传入了
+什么参数等信息。
+* JavaScript 引擎可以优化符合尾调用条件的函数，以节省栈空间。
+* 闭包的作用域链中包含自己的一个变量对象，然后是包含函数的变量对象，直到全局上下文的
+变量对象。
+* 通常，函数作用域及其中的所有变量在函数执行完毕后都会被销毁。
+* 闭包在被函数返回之后，其作用域会一直保存在内存中，直到闭包被销毁。
+* 函数可以在创建之后立即调用，执行其中代码之后却不留下对函数的引用。
+* 立即调用的函数表达式如果不在包含作用域中将返回值赋给一个变量，则其包含的所有变量都
+会被销毁。
+* 虽然 JavaScript 没有私有对象属性的概念，但可以使用闭包实现公共方法，访问位于包含作用域
+中定义的变量。
+* 可以访问私有变量的公共方法叫作特权方法。
+* 特权方法可以使用构造函数或原型模式通过自定义类型中实现，也可以使用模块模式或模块增
+强模式在单例对象上实现。
