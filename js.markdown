@@ -1,3 +1,92 @@
+# 线程与进程
+JavaScript 单线程指的是浏览器中负责解释和执行 JavaScript 代码的只有一个线程，即为JS引擎线程，但是浏览器的渲染进程是提供多个线程的，如下：
+
+* JS引擎线程
+* 事件触发线程
+* 定时触发器线程
+* 异步http请求线程
+* GUI渲染线程  
+
+当遇到计时器、DOM事件监听或者是网络请求的任务时，JS引擎会将它们直接交给 webapi，也就是浏览器提供的相应线程（如定时器线程为setTimeout计时、异步http请求线程处理网络请求）去处理，而JS引擎线程继续后面的其他任务，这样便实现了 异步非阻塞。
+
+定时器触发线程也只是为 setTimeout(..., 1000) 定时而已，时间一到，还会把它对应的回调函数(callback)交给 任务队列 去维护，JS引擎线程会在适当的时候去任务队列取出任务并执行。
+## 事件循环与消息队列
+JavaScript 通过 事件循环 event loop 的机制来解决什么时候处理队列任务的问题
+
+其实 事件循环 机制和 任务队列 的维护是由事件触发线程控制的。
+
+事件触发线程 同样是浏览器渲染引擎提供的，它会维护一个 任务队列。
+
+JS引擎线程遇到异步（DOM事件监听、网络请求、setTimeout计时器等...），会交给相应的线程单独去维护异步任务，等待某个时机（计时器结束、网络请求成功、用户点击DOM），然后由 事件触发线程 将异步对应的 回调函数 加入到消息队列中，消息队列中的回调函数等待被执行。
+
+同时，JS引擎线程会维护一个 执行栈，同步代码会依次加入执行栈然后执行，结束会退出执行栈。
+
+如果执行栈里的任务执行完成，即执行栈为空的时候（即JS引擎线程空闲），事件触发线程才会从消息队列取出一个任务（即异步的回调函数）放入执行栈中执行。
+
+消息队列是类似队列的数据结构，遵循先入先出(FIFO)的规则
+
+*  1. 所有同步任务都在主线程上执行，形成一个执行栈（execution context stack）。
+*  2. 主线程之外，还存在一个"任务队列"（task queue）。只要异步任务有了运行结果，就在"任务队列"之中放置一个事件。
+*  3. 一但"执行栈"中的所有同步任务执行完毕，系统就会读取"任务队列"，看看里面有哪些事件。那些对应的异步任务，于是结束等待状态，进入执行栈，开始执行。
+*  4. 主线程不断重复上面的第三步。
+
+只要主线程空了，就会去读取"任务队列"，这就是JavaScript的运行机制。这个过程会不断重复，这种机制就被称为事件循环（event loop）机制。
+
+[详细参考看引用](https://zhuanlan.zhihu.com/p/139967525)
+
+
+所有任务分为 macro-task 和 micro-task:
+
+macro-task：主代码块、setTimeout、setInterval等（可以看到，事件队列中的每一个事件都是一个 macro-task，现在称之为宏任务队列）
+micro-task：Promise、process.nextTick等
+JS引擎线程首先执行主代码块。
+
+每次执行栈执行的代码就是一个宏任务，包括任务队列(宏任务队列)中的，因为执行栈中的宏任务执行完会去取任务队列（宏任务队列）中的任务加入执行栈中，即同样是事件循环的机制。
+
+在执行宏任务时遇到Promise等，会创建微任务（.then()里面的回调），并加入到微任务队列队尾。
+
+micro-task必然是在某个宏任务执行的时候创建的，而在下一个宏任务开始之前，浏览器会对页面重新渲染(task >> 渲染 >> 下一个task(从任务队列中取一个))。同时，在上一个宏任务执行完成后，渲染页面之前，会执行当前微任务队列中的所有微任务。
+
+也就是说，在某一个macro-task执行完后，在重新渲染与开始下一个宏任务之前，就会将在它执行期间产生的所有micro-task都执行完毕（在渲染前）。
+
+这样就可以解释 "promise 1" "promise 2" 在 "timer over" 之前打印了。"promise 1" "promise 2" 做为微任务加入到微任务队列中，而 "timer over" 做为宏任务加入到宏任务队列中，它们同时在等待被执行，但是微任务队列中的所有微任务都会在开始下一个宏任务之前都被执行完。
+
+在node环境下，process.nextTick的优先级高于Promise，也就是说：在宏任务结束后会先执行微任务队列中的nextTickQueue，然后才会执行微任务中的Promise。
+执行机制：
+
+* 执行一个宏任务（栈中没有就从事件队列中获取）  
+* 执行过程中如果遇到微任务，就将它添加到微任务的任务队列中  
+* 宏任务执行完毕后，立即执行当前微任务队列中的所有微任务（依次执行）  
+* 当前宏任务执行完毕，开始检查渲染，然后GUI线程接管渲染  
+* 渲染完毕后，JS引擎线程继续，开始下一个宏任务（从宏任务队列中获取）  
+![alt text](/img/task.png)
+
+宏任务 macro-task(Task)  
+一个event loop有一个或者多个task队列。task任务源非常宽泛，比如ajax的onload，click事件，基本上我们经常绑定的各种事件都是task任务源，还有数据库操作（IndexedDB ），需要注意的是setTimeout、setInterval、setImmediate也是task任务源。总结来说task任务源：
+
+script  
+setTimeout  
+setInterval  
+setImmediate  
+I/O  
+requestAnimationFrame  
+UI rendering  
+
+微任务 micro-task(Job)  
+microtask 队列和task 队列有些相似，都是先进先出的队列，由指定的任务源去提供任务，不同的是一个 event loop里只有一个microtask 队列。另外microtask执行时机和Macrotasks也有所差异
+
+process.nextTick  
+promises  
+Object.observe  
+MutationObserver  
+
+宏任务和微任务的区别
+
+宏队列可以有多个，微任务队列只有一个,所以每创建一个新的settimeout都是一个新的宏任务队列，执行完一个宏任务队列后，都会去checkpoint 微任务。  
+一个事件循环后，微任务队列执行完了，再执行宏任务队列  
+一个事件循环中，在执行完一个宏队列之后，就会去check 微任务队列  
+
+
 # 起步
 * js 全称 javascript, 是一门解释型弱类型编程语言，js包含  
     * ECMAScript 
@@ -2097,3 +2186,410 @@ console.log(i); // 抛出错误
 * 可以访问私有变量的公共方法叫作特权方法。
 * 特权方法可以使用构造函数或原型模式通过自定义类型中实现，也可以使用模块模式或模块增
 强模式在单例对象上实现。
+
+## 期约 与 异步函数
+* 异步类似于系统终端, 期约的处理程序是先添加到消息队列，然后才逐个执行, 但是具体执行时间不可预知, 推入后函数将会结束
+    ```
+        setTimeout(() =>{} , 1000)
+        // 1000毫秒后 将方法推入消息队列中， 等待执行
+        // 推到队列之后，回调什么时候出列被执行是未知的
+    ```
+
+### promise
+*  使用 new操作符 初始化期约  let p  =  new Promise(执行器函数executor)
+* 期约状态机
+    * 三种状态， 且不可以逆， 只能从 pending到resolved 或 pending到rejected
+        * 待定 pending
+        * 解决 resolved
+        * 拒绝 rejected
+    * 期约的状态是私有的，不能直接通过 JavaScript 检测到。这主要是为了避免根据读取到
+的期约状态，以同步方式处理期约对象。另外，期约的状态也不能被外部 JavaScript 代码修改。这与不
+能读取该状态的原因是一样的：期约故意将异步行为封装起来，从而隔离外部的同步代码
+    * 由于期约的状态是私有的，所以只能在内部进行操作。内部操作在期约的执行器函数中完成。执行
+器函数主要有两项职责：初始化期约的异步行为和控制状态的最终转换。其中，控制期约状态的转换是
+通过调用它的两个函数参数实现的。这两个函数参数通常都命名为 resolve()和 reject()。调用
+resolve()会把状态切换为兑现，调用 reject()会把状态切换为拒绝。另外，调用 reject()也会抛
+出错误
+        ```
+            let p1 = new Promise((resolve, reject) => resolve()); 
+            setTimeout(console.log, 0, p1); // Promise <resolved> 
+            let p2 = new Promise((resolve, reject) => reject()); 
+            setTimeout(console.log, 0, p2); // Promise <rejected>
+            // Uncaught error (in promise)
+
+            let p = new Promise((resolve, reject) => { 
+                resolve();
+                reject(); // 没有效果
+            });
+        ```
+    * 执行器函数是同步执行的。这是因为执行器函数是期约的初始化程序
+    * 无论 resolve()和 reject()中的哪个被调用，状态转换都不可撤销了
+    * 期约并非一开始就必须处于待定状态，然后通过执行器函数才能转换为落定状态Promise.resolve 和 Promise.reject
+        * Promise.resolve() 可以把任何值都转换为一个解决的期约, 具有幂等逻辑
+        * Promise.reject()会实例化一个拒绝的期约并抛出一个异步错误
+        ```
+            // 下面两个期约实例实际上是一样的
+            let p1 = new Promise((resolve, reject) => resolve()); 
+            let p2 = Promise.resolve();
+
+            // 使用Promise.resolve()，实际上可以把任何值都转换为一个解决的期约
+            Promise.resolve(3)
+
+            Promise.resolve(p) ===  Promise.resolve(Promise.resolve(p)) // true
+        ```
+    * promise是同步对象（在同步执行模式中使用），但也是异步执行模式的媒介。 拒绝期约的错误并没有抛到执行同步代码的线程里，而是通过浏览器异步消息队列来处理的。因此，try/catch 块并不能捕获该错误。代码一旦开始以异步模式执行，则唯一与之交互的方式就是使用异步结构——更具体地说，就是期约的方法
+    * 在一个解决期约上调用 then()会把 onResolved 处理程序推进消息队列，但这个
+处理程序在当前线程上的同步代码执行完成前不会执行。因此，跟在 then()后面的同步代码一定先于
+处理程序执行。
+* 期约的实例方法  
+期约实例的方法是连接外部同步代码与内部异步代码之间的桥梁。这些方法可以访问异步操作返回
+的数据，处理期约成功和失败的结果，连续对期约求值，或者添加只有期约进入终止状态时才会执行的
+代码
+    * then() catch() finally() 都将返回一个promise包装，默认是 Promise.resolve()
+    *  实现 Thenable 接口
+        ```
+            class MyThenable { 
+                then() {} 
+            }
+        ```
+    * Promise.prototype.then(onResolved, onRejected)  
+        * Promise.prototype.then()是为期约实例添加处理程序的主要方法。这个 then()方法接收最多
+两个参数：onResolved 处理程序和 onRejected 处理程序。这两个参数都是可选的，如果提供的话，
+则会在期约分别进入“兑现”和“拒绝”状态时执行  
+        * 因为期约只能转换为最终状态一次，所以这两个操作一定是互斥的。
+        * 传给 then()的任何非函数类型的参数都会被静默忽略
+    * Promise.prototype.catch(onRejected)
+        * 调用它就相当于调用 Promise.prototype.then(null, onRejected)
+    * Promise.prototype.finally()
+        * 与状态无关,清除冗余代码，无法知道是否完成或拒绝
+        * 大多数情况下它将表现为父期约的传递
+    * promise((resolve,reject)=> {   resolve('111') })  resolve(inner)的inner 会传递给then的 onResolved函数;  reject(inner)会传递给then和catch的 onRejected
+* promise 的连锁与合成  
+连锁就是一个期约接一个期约地拼接，合成则是将多个期约组合为一个期约
+    * 连锁:  由于then() catch() finally() 都将返回一个promise包装，所以可以在一个结束之后返回一个新的promise用于连锁
+        ```
+            let p = new Promise((resolve,reject) =>{ console.log(1); setTimeout(resolve,1000)   })
+            p.then(() =>{
+                return new Promise((resolve) =>{  console.log(2); setTimeout(resolve,1000)      })
+            }).then(() =>{ 
+                return 3
+            }).then((a) =>{ 
+
+                console.log(a) // 3
+            })
+        ```
+    * 合成： Promise.all()和 Promise.race()
+        * Promise.all()静态方法创建的期约会在一组期约全部解决之后再解决。这个静态方法接收一个
+可迭代对象，返回一个新期约
+            ```
+                // 一次拒绝会导致最终期约拒绝 // 第一个拒绝的期约会将自己的理由作为合成期约的拒绝理由
+                let p2 = Promise.all([ 
+                    Promise.resolve(), 
+                    Promise.reject(123456), 
+                    Promise.reject(789456), 
+                    Promise.resolve() 
+                ]); 
+                setTimeout(console.log, 0, p2); // Promise <rejected>
+                p2.catch((res) =>{  console.log(res)   })  // 123456
+                // 全部完成则返回一个包含所有结果的数组
+                let p = Promise.all([ 
+                    Promise.resolve(3), 
+                    Promise.resolve(), 
+                    Promise.resolve(4) 
+                ]);
+                p.then((res) =>{  console.log(res)   })  // [3,undefined,4]
+
+            ```
+        * Promise.race()静态方法返回一个包装期约，是一组集合中最先解决或拒绝的期约的镜像。这个
+方法接收一个可迭代对象，返回一个新期约
+            * 不会对解决或拒绝的期约区别对待。无论是解决还是拒绝，只要是第一个落定的
+期约，Promise.race()就会包装其解决值或拒绝理由并返回新期约
+            ```
+            // 解决先发生，超时后的拒绝被忽略
+            let p1 = Promise.race([ 
+                Promise.resolve(3), 
+                new Promise((resolve, reject) => setTimeout(reject, 1000)) 
+            ]); 
+            setTimeout(console.log, 0, p1); // Promise <resolved>: 3
+            ```
+        * 将多个函数用promise串起来
+            ``` 
+                function addTwo(x) {return x + 2;} 
+                function addThree(x) {return x + 3;} 
+                function addFive(x) {return x + 5;} 
+                function compose(...fns) { 
+                return (x) => fns.reduce((promise, fn) => promise.then(fn), Promise.resolve(x)) 
+                } 
+                let addTen = compose(addTwo, addThree, addFive);
+                addTen(8).then(console.log); // 18
+
+
+            ```
+### 异步函数
+异步函数，也称为“async/await”（语法关键字）
+* async 关键字用于声明异步函数。这个关键字可以用在函数声明、函数表达式、箭头函数和方法
+* 异步函数如果使用 return 关键字返回了值（如果没有 return 则会返回 undefined），这
+个值会被 Promise.resolve()包装成一个期约对象。异步函数始终返回期约对象，在函数外部调用这这个对象会得到它的返回值
+* 用 await关键字可以暂停异步函数代码的执行，等待期约解决
+* JavaScript 运行时在碰到 await 关键字时，会记录在哪里暂停执行。``等到 await 右边的值可用了``，JavaScript 运行时会向消息队列中推送一个任务，这个任务会恢复异步函数的执行
+* 
+### 应用
+* 实现sleep
+    ```
+        async function sleep(delay) {
+            return new promise((resolve) => settimeout(resolve,delay))
+        }
+        async function foo() { 
+            const t0 = Date.now(); 
+            await sleep(1500); // 暂停约 1500 毫秒
+            console.log(Date.now() - t0); 
+        } 
+        foo();
+    ```
+* 实现异步并发
+    ```
+        async function request(id) {
+            return new promise((reslove) =>{
+                console.log(id, 'start')
+                setTimeout(()=>{
+                    reslove(id)
+                    console.log(id, 'finish')
+                }, 1000)
+            })
+        }
+
+        async function taskdo(tasklist){
+            let p1 = request(1)
+            let p2 = request(2)
+            let p3 = request(3)
+
+            await p1
+            await p2
+            await p3
+            // 返回的结果不一定是按顺序的
+
+        }
+        
+    ```
+## BOM
+    浏览器对象模型
+### window
+* BOM 的核心是 window 对象，表示浏览器的实例。window 对象在浏览器中有两重身份，一个是
+ECMAScript 中的 Global 对象，另一个就是浏览器窗口的 JavaScript 接口。这意味着网页中定义的所有
+对象、变量和函数都以 window 作为其 Global 对象，都可以访问其上定义的 parseInt()等全局方法,通过 var 声明的所有全局变量和函
+数都会变成 window 对象的属性和方法
+* screenLeft 和 screenTop 属性，用于表示窗口相对于屏幕左侧和顶部的位置 ，返回值的单位是 CSS 像素
+* 像素比: CSS 像素是 Web 开发中使用的统一像素单位
+    * 不同像素密度的屏幕下就会有不同的
+缩放系数，以便把物理像素（屏幕实际的分辨率）转换为 CSS 像素（浏览器报告的虚拟分辨率）
+    * 这个物理像素与 CSS 像素之间的转换比率由 window.devicePixelRatio 属性提供
+    * window.devicePixelRatio 实际上与每英寸像素数（DPI，dots per inch）是对应的。DPI 表示单
+位像素密度，而 window.devicePixelRatio 表示物理像素与逻辑像素之间的缩放系数。
+* 窗口大小：window.
+    * innerWidth、innerHeight、outerWidth 和 outerHeight。outerWidth 和 outerHeight 返回浏
+览器窗口自身的大小（不管是在最外层 window 上使用，还是在窗格<frame>中使用）。innerWidth
+和 innerHeight 返回浏览器窗口中页面视口的大小（不包含浏览器边框和工具栏）。
+    * document.documentElement.clientWidth 和 document.documentElement.clientHeight
+返回页面视口的宽度和高度
+* 视口位置: 浏览器窗口尺寸通常无法满足完整显示整个页面，为此用户可以通过滚动在有限的视口中查看文
+档
+    * 度量文档相对于视口滚动距离的属性有两对，返回相等的值：window.pageXoffset/window. 
+scrollX 和 window.pageYoffset/window.scrollY,
+    * 可以使用 scroll()、scrollTo()和 scrollBy()方法滚动页面,可以通过 behavior 属性
+告诉浏览器是否平滑滚动
+        ```
+            // 相对于当前视口向下滚动 100 像素
+            window.scrollBy(0, 100); 
+            // 相对于当前视口向右滚动 40 像素
+            window.scrollBy(40, 0);
+
+            // 正常滚动 
+            window.scrollTo({ 
+                left: 100, 
+                top: 100, 
+                behavior: 'auto' 
+            }); 
+            // 平滑滚动
+            window.scrollTo({ 
+                left: 100, 
+                top: 100, 
+                behavior: 'smooth' 
+            });
+        ```
+* 导航与打开新窗口
+    * 如果返回null说明open被禁用
+    * window.open()方法可以用于导航到指定 URL，也可以用于打开新浏览器窗口
+        ``` 
+        // 第二个参数是一个已经存在的窗口或窗格（frame）的名字
+        // 第三个参数是 特性字符串是一个逗号分隔的设置字符串 例如 "height=400,width=400,top=10,left=10,resizable=yes"
+        
+        let wroxWin = window.open(要加载的 URL,目标窗口,特性字符串, 表示新窗口在浏览器历史记录中是否替代当前加载页面的布尔值)
+
+        // window.open()方法返回一个对新建窗口的引用。这个对象与普通 window 对象没有区别，只是为控制新窗口提供了方便
+        // 缩放
+        wroxWin.resizeTo(500, 500); 
+        // 移动
+        wroxWin.moveTo(100, 100);
+        // 关闭
+        wroxWin.close();
+        // 把 opener 设置为 null 表示新打开的标签页不需要与打开它的标签页通信，因此可以在独立进程中运行
+        wroxWin.opener = null;
+        ```
+* 定时器
+
+JavaScript 在浏览器中是单线程执行的,但允许使用定时器指定在某个时间之后或每隔一段时间就
+执行相应的代码,setTimeout()用于指定在一定时间后执行某些代码，而 setInterval()用于指定
+每隔一段时间执行某些代码
+* 为了调度不同代码的执行，JavaScript 维护了一个任务队列。其中的任务会按照添
+加到队列的先后顺序执行。setTimeout()的第二个参数只是告诉 JavaScript 引擎在指定的毫秒数过后
+把任务添加到这个队列。如果队列是空的，则会立即执行该代码。如果队列不是空的，则代码必须等待
+前面的任务执行完才能执行。
+* 调用 setTimeout()时，会返回一个表示该超时排期的数值 ID。这个超时 ID 是被排期执行代码的
+唯一标识符，可用于取消该任务。要取消等待中的排期任务，可以调用 clearTimeout()方法并传入超
+时 ID
+
+* 系统对话框
+    * 使用 alert()、confirm()和 prompt()方法，可以让浏览器调用系统对话框向用户显示消息
+    * 详情看文档不过多赘述
+### location
+
+* location 是最有用的 BOM 对象之一，提供了当前窗口中加载文档的信息，以及通常的导航功能。
+这个对象独特的地方在于，它既是 window 的属性，也是 document 的属性。也就是说，
+window.location 和 document.location 指向同一个对象。location 对象不仅保存着当前加载文
+档的信息，也保存着把 URL 解析为离散片段后能够通过属性访问的信息
+    * 具体参考文档
+* 查询字符串：location.search 返回了从问号开始直到 URL 末尾的所有内容
+* URLSearchParams
+    * URLSearchParams 提供了一组标准 API 方法，通过它们可以检查和修改查询字符串。给
+URLSearchParams 构造函数传入一个查询字符串，就可以创建一个实例。这个实例上暴露了 get()、
+set()和 delete()等方法，可以对查询字符串执行相应操作
+* 操作地址
+    ```
+    location.assign("http://www.wrox.com");
+    window.location = "http://www.wrox.com"; 
+    location.href = "http://www.wrox.com";
+    location.reload(); // 重新加载，可能是从缓存加载
+    location.reload(true); // 重新加载，从服务器加载
+    // 假设当前 URL 为 http://www.wrox.com/WileyCDA/ 
+    // 把 URL 修改为 http://www.wrox.com/WileyCDA/#section1 
+    location.hash = "#section1"; 
+    // 把 URL 修改为 http://www.wrox.com/WileyCDA/?q=javascript 
+    location.search = "?q=javascript"; 
+    // 把 URL 修改为 http://www.somewhere.com/WileyCDA/ 
+    location.hostname = "www.somewhere.com"; 
+    // 把 URL 修改为 http://www.somewhere.com/mydir/ 
+    location.pathname = "mydir"; 
+    // 把 URL 修改为 http://www.somewhere.com:8080/WileyCDA/ 
+    location.port = 8080; 
+    除了 hash 之外，只要修改 location 的一个属性，就会导致页面重新加载新 URL。
+    ```
+### navigator
+
+客户端标识
+
+* navigator 对象实现了 NavigatorID 、 NavigatorLanguage 、 NavigatorOnLine 、
+NavigatorContentUtils 、 NavigatorStorage 、 NavigatorStorageUtils 、 NavigatorConcurrentHardware、NavigatorPlugins 和 NavigatorUserMedia 接口定义的属性和方法
+* 检测插件: window.navigator.plugins
+### screen
+
+window 的另一个属性 screen 对象，是为数不多的几个在编程中很少用的 JavaScript 对象。这个对
+象中保存的纯粹是客户端能力信息，也就是浏览器窗口外面的客户端显示器的信息，比如像素宽度和像
+素高度。每个浏览器都会在 screen 对象上暴露不同的属性
+
+### history 对象
+history 对象表示当前窗口首次使用以来用户的导航历史记录。因为 history 是 window 的属性，
+所以每个 window 都有自己的 history 对象。出于安全考虑，这个对象不会暴露用户访问过的 URL，
+但可以通过它在不知道实际 URL 的情况下前进和后退
+
+```
+// 后退一页
+history.go(-1); 
+// 前进一页
+history.go(1); 
+// 前进两页
+history.go(2);
+// 后退一页
+history.back(); 
+// 前进一页
+history.forward();
+
+```
+## DOM
+
+    文档对象模型（DOM，Document Object Model）是 HTML 和 XML 文档的编程接口。DOM 表示由多层节点构成的文档，通过它开发者可以添加、删除和修改页面的各个部分
+
+* 层级节点
+    * Node类型
+    * document 对象
+        *   向网页输出流中写入内容。这个能力对应 4 个方法：write()、
+writeln()、open()和 close()。其中，write()和 writeln()方法都接收一个字符串参数，可以将
+这个字符串写入网页中。write()简单地写入文本，而 writeln()还会在字符串末尾追加一个换行符
+（\n）
+    * Element 类型
+        * 对于dom元素的操作 包括不限于 设置属性 获取属性 修改内容
+    * Text 类型
+    * Comment 类型
+    * CDATASection 类型
+    * DocumentType 类型
+    * DocumentFragment 类型
+    * Attr 类型
+* DOM编程
+* MutationObserver
+
+#### MutationObserver
+
+    MutationObserver是 JavaScript 中的一个接口，用于监视 DOM 树的变化。它可以观察到 DOM 节点的添加、删除、属性变化等操作，并在这些变化发生时触发回调函数
+
+
+* MutationObserver 接口是出于性能考虑而设计的，其核心是异步回调与记录队列模型。为了在
+大量变化事件发生时不影响性能，每次变化的信息（由观察者实例决定）会保存在 MutationRecord
+实例中，然后添加到记录队列。这个队列对每个 MutationObserver 实例都是唯一的，是所有 DOM
+变化事件的有序列表
+* 使用
+    * 可以在observe方法中传递一个配置对象来指定要观察的变化类型：
+        * childList：观察目标节点的子节点的添加、删除。
+        * attributes：观察目标节点的属性变化。
+        * characterData：观察目标节点的文本内容变化。
+        * subtree：如果设置为true，则观察目标节点及其所有后代节点。
+    ```
+       const observer = new MutationObserver((mutationsList, observer) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    console.log('Child nodes changed.');
+                } else if (mutation.type === 'attributes') {
+                    console.log(`Attribute ${mutation.attributeName} changed.`);
+                }
+            }
+        });
+
+        const targetNode = document.getElementById('some-element');
+        observer.observe(targetNode, { attributes: true, childList: true, subtree: true });
+
+    ```
+* 应用 : 当观察的节点发生变化的时候,自动想要
+    * 自动保存
+    * 主题切换检测
+    * 页面结构变化检测
+    * 实时表单验证
+
+
+* 小结
+文档对象模型（DOM，Document Object Model）是语言中立的 HTML 和 XML 文档的 API。DOM Level 1 将 HTML 和 XML 文档定义为一个节点的多层级结构，并暴露出 JavaScript 接口以操作文档的底
+层结构和外观。  
+DOM 由一系列节点类型构成，主要包括以下几种。  
+* Node 是基准节点类型，是文档一个部分的抽象表示，所有其他类型都继承 Node。
+* Document 类型表示整个文档，对应树形结构的根节点。在 JavaScript 中，document 对象是
+Document 的实例，拥有查询和获取节点的很多方法。
+* Element 节点表示文档中所有 HTML 或 XML 元素，可以用来操作它们的内容和属性。
+* 其他节点类型分别表示文本内容、注释、文档类型、CDATA 区块和文档片段。  
+DOM 编程在多数情况下没什么问题，在涉及<script>和<style>元素时会有一点兼容性问题。因
+为这些元素分别包含脚本和样式信息，所以浏览器会将它们与其他元素区别对待。  
+要理解 DOM，最关键的一点是知道影响其性能的问题所在。DOM 操作在 JavaScript 代码中是代价
+比较高的，NodeList 对象尤其需要注意。NodeList 对象是“实时更新”的，这意味着每次访问它都
+会执行一次新的查询。考虑到这些问题，实践中要尽量减少 DOM 操作的数量。  
+MutationObserver 是为代替性能不好的 MutationEvent 而问世的。使用它可以有效精准地监控
+DOM 变化，而且 API 也相对简单。  
+
+
+## 事件
+
