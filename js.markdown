@@ -2755,3 +2755,360 @@ list.addEventListener("click", (event) => {
 事件是 JavaScript 中最重要的主题之一，理解事件的原理及其对性能的影响非常重要。
 
 ## 动画与 Canvas 图形
+
+### requestAnimationFrame
+
+requestAnimationFrame是浏览器提供的一个用于在浏览器下一次重绘之前执行特定函数的方法  
+这个方法会告诉浏览器要执行动画了，于是浏览器可以通过最优方式确定重绘的时序, 知道何时绘制下一帧是创造平滑动画的关键
+
+* 一般计算机显示器的屏幕刷新率都是 60Hz，基本上意味着每秒需要重绘 60 次。大多数浏览器会限制重绘频率，使其不超出屏幕的刷新率，这是因为超过刷新率，用户也感知不到
+* 因此，实现平滑动画最佳的重绘间隔为 1000 毫秒/60，大约 17 毫秒。以这个速度重绘可以实现最平滑的动画，因为这已经是浏览器的极限了。如果同时运行多个动画，可能需要加以限流，以免 17 毫秒
+的重绘间隔过快，导致动画过早运行完。
+* requestAnimationFrame()方法接收一个参数，此参数是一个要在重绘屏幕前调用的函数, 这个函数就是修改 DOM 样式以反映下一次重绘有什么变化的地方
+    * 为了实现动画循环，可以把多个 requestAnimationFrame()调用串联起来，就像以前使用 setTimeout()时一样：
+        ```
+            function updateProgress() { 
+                var div = document.getElementById("status"); 
+                div.style.width = (parseInt(div.style.width, 10) + 5) + "%"; 
+                if (div.style.left != "100%") { 
+                    requestAnimationFrame(updateProgress); 
+                } 
+            } 
+            requestAnimationFrame(updateProgress);
+            // 停止
+            let requestID = window.requestAnimationFrame(() => { 
+                console.log('Repaint!'); 
+            }); 
+            window.cancelAnimationFrame(requestID);
+     ```
+    * 因为 requestAnimationFrame()只会调用一次传入的函数，所以每次更新用户界面时需要再手动调用它一次。同样，也需要控制动画何时停止。结果就会得到非常平滑的动画。目前为止，requestAnimationFrame()已经解决了浏览器不知道 JavaScript 动画何时开始的问题，以及最佳间隔是多少的问题，但是，不知道自己的代码何时实际执行的问题呢？这个方案同样也给出了解决方法。
+    * 传给 requestAnimationFrame()的函数实际上可以接收一个参数，此参数是一个 DOMHighResTimeStamp 的实例（比如 performance.now()返回的值），表示下次重绘的时间。这一点非常重要：requestAnimationFrame()实际上把重绘任务安排在了未来一个已知的时间点上，而且通过这个参数告诉了开发者。基于这个参数，就可以更好地决定如何调优动画了。
+
+### canvas 2D画布
+
+* 创建<canvas>元素时至少要设置其 width 和 height 属性
+* 要在画布上绘制图形，首先要取得绘图上下文。使用 getContext()方法可以获取对绘图上下文的
+引用。对于平面图形，需要给这个方法传入参数"2d"，表示要获取 2D 上下文对象
+* 可以使用 toDataURL()方法导出<canvas>元素上的图像: 如果画布中的图像是其他域绘制过来的，toDataURL()方法就会抛出错误
+```
+// <canvas id="drawing" width="200" height="200">A drawing of something.</canvas>
+let drawing = document.getElementById("drawing"); 
+// 确保浏览器支持<canvas> 
+if (drawing.getContext) { 
+    // 取得图像的数据 URI 
+    let imgURI = drawing.toDataURL("image/png"); 
+    // 显示图片
+    let image = document.createElement("img"); 
+    image.src = imgURI; 
+    document.body.appendChild(image); 
+}
+
+```
+#### 绘制
+* 2D 上下文的坐标原点(0, 0)在<canvas>元素的左上角。所有坐标值都相对于该点计算，因此 x 坐标向右增长，y 坐标向下增长。默认情况下，width 和 height 表示两个方向上像素的最大值。
+* 填充和描边
+* 绘制矩形
+* 绘制路径
+* 绘制文本
+* 变换
+* 绘制图像
+* 阴影
+* 渐变
+* 图案
+* 图像数据
+* 合成
+### WebGL  3D画布
+
+## javascript API
+* Atomics与sharedArrayBuffer
+* 跨上下文消息 XDM （cross-document messaging）
+    * 跨上下文消息用于窗口之间通信或工作线程之间通信
+    * postMessage(消息,表示目标接收源的字符串,可选的可传输对象的数组)
+        ```
+            let iframeWindow = document.getElementById("myframe").contentWindow; 
+            iframeWindow.postMessage("A secret", "http://www.wrox.com");
+            // 最后一行代码尝试向内嵌窗格中发送一条消息，而且指定了源必须是"http://www.wrox.com"。如果源匹配，那么消息将会交付到内嵌窗格；否则，postMessage()什么也不做。这个限制可以保护信息不会因地址改变而泄露。如果不想限制接收目标，则可以给 postMessage()的第二个参数传"*"，但不推荐这么做
+        ```
+    * 接收到 XDM 消息后，window 对象上会触发 message 事件。这个事件是异步触发的，因此从消息发出到接收到消息（接收窗口触发 message 事件）可能有延迟。传给 onmessage 事件处理程序的 event对象包含以下 3 方面重要信息。
+        * data：作为第一个参数传递给 postMessage()的字符串数据。
+        * origin：发送消息的文档源，例如"http://www.wrox.com"。
+        * source：发送消息的文档中 window 对象的代理。这个代理对象主要用于在发送上一条消息的窗口中执行 postMessage()方法。如果发送窗口有相同的源，那么这个对象应该就是 window对象。
+        ```
+            window.addEventListener("message", (event) => { 
+            // 确保来自预期发送者
+            if (event.origin == "http://www.wrox.com") { 
+            // 对数据进行一些处理
+            processMessage(event.data); 
+            // 可选：向来源窗口发送一条消息
+            event.source.postMessage("Received!", "http://p2p.wrox.com"); 
+            } 
+            });
+        ```
+* Encoding API
+* File API 与 Blob API
+    * FileReader 类型: FileReader类型表示一种异步文件读取机制。可以把FileReader 想象成类似于XMLHttpRequest，只不过是用于从文件系统读取文件，而不是从服务器读取数据
+        * readAsText(file, encoding)：从文件中读取纯文本内容并保存在 result 属性中。第二个参数表示编码，是可选的。
+        * readAsDataURL(file)：读取文件并将内容的数据 URI 保存在 result 属性中。
+        * readAsBinaryString(file)：读取文件并将每个字符的二进制数据保存在 result 属性中。
+        * readAsArrayBuffer(file)：读取文件并将文件内容以 ArrayBuffer 形式保存在 result 属性。  
+        这些读取数据的方法为处理文件数据提供了极大的灵活性。例如，为了向用户显示图片，可以将图片读取为数据 URI，而为了解析文件内容，可以将文件读取为文本  
+        * 读取的状态 progress(进行中)、error(错误) 和 load(加载中)、 progress 事件每 50 毫秒就会触发一次
+        * progress 事件用于跟踪和显示读取文件的进度，而 error 事件用于监控错误
+        * 如果想提前结束文件读取，则可以在过程中调用 abort()方法，从而触发 abort 事件
+    * Blob 与部分读取：blob 表示二进制大对象（binary larget object），是 JavaScript 对不可修改二进制数据的封装类型  
+        某些情况下，可能需要读取部分文件而不是整个文件。为此，File 对象提供了一个名为 slice()的方法。slice()方法接收两个参数：起始字节和要读取的字节数。这个方法返回一个 Blob 的实例，而 Blob 实际上是 File 的超类。  
+        * 包含字符串的数组、ArrayBuffers、ArrayBufferViews，甚至其他 Blob 都可以用来创建 blob。Blob构造函数可以接收一个 options 参数，并在其中指定 MIME 类型
+        * Blob 对象有一个 size 属性和一个 type 属性，还有一个 slice()方法用于进一步切分数据。另外也可以使用 FileReader 从 Blob 中读取数据
+    * 对象 URL 与 Blob  
+        对象 URL 有时候也称作 Blob URL，是指引用存储在 File 或 Blob 中数据的 URL。对象 URL 的优点是不用把文件内容读取到 JavaScript 也可以使用文件。只要在适当位置提供对象 URL 即可。要创建对象 URL，可以使用 window.URL.createObjectURL()方法并传入 File 或 Blob 对象。这个函数返回的值是一个指向内存中地址的字符串。因为这个字符串是 URL，所以可以在 DOM 中直接使用  
+    * 读取拖放文件
+        * 在页面上创建放置目标后，可以从桌面上把文件拖动并放到放置目标。这样会像拖放图片或链接一样触发 drop 事件。 被放置的文件可以通过事件的 event.dataTransfer.files 属性读到，这个属性保存着一组 File 对象，就像文本输入字段一样
+        ```
+            let droptarget = document.getElementById("droptarget"); 
+            function handleEvent(event) { 
+                let info = "", output = document.getElementById("output"), files, i, len; 
+                event.preventDefault(); 
+                if (event.type == "drop") { 
+                    files = event.dataTransfer.files; 
+                    i = 0; 
+                    len = files.length; 
+                    while (i < len) { 
+                        info += `${files[i].name} (${files[i].type}, ${files[i].size} bytes)<br>`; 
+                        i++; 
+                    } 
+                    output.innerHTML = info; 
+                } 
+            } 
+            droptarget.addEventListener("dragenter", handleEvent); 
+            droptarget.addEventListener("dragover", handleEvent); 
+            droptarget.addEventListener("drop", handleEvent);
+        ```
+* 媒体元素
+* 原生拖放
+    * 拖放事件几乎可以让开发者控制拖放操作的方方面面。关键的部分是确定每个事件是在哪里触发的。有的事件在被拖放元素上触发，有的事件则在放置目标上触发。在某个元素被拖动时，会（按顺序）触发以下事件：
+        * dragstart
+        * drag
+        * dragend
+    * 在把元素拖动到一个有效的放置目标上时，会依次触发以下事件：
+        * dragenter
+        * dragover
+        * dragleave 或 drop
+    * 可拖动能力 draggable="false"
+* Notifications API
+* Page Visibility API
+    这个 API 本身非常简单，由 3 部分构成。  
+    * document.visibilityState 值，表示下面 4 种状态之一。
+     页面在后台标签页或浏览器中最小化了。
+     页面在前台标签页中。
+     实际页面隐藏了，但对页面的预览是可见的（例如在 Windows 7 上，用户鼠标移到任务栏图标
+    上会显示网页预览）。
+     页面在屏外预渲染。
+    * visibilitychange 事件，该事件会在文档从隐藏变可见（或反之）时触发。
+    * document.hidden 布尔值，表示页面是否隐藏。这可能意味着页面在后台标签页或浏览器中被最小
+    化了。这个值是为了向后兼容才继续被浏览器支持的，应该优先使用 document.visibilityState
+    检测页面可见性。  
+    要想在页面从可见变为隐藏或从隐藏变为可见时得到通知，需要监听 visibilitychange 事件。  
+    document.visibilityState 的值是以下三个字符串之一：  
+    * "hidden"
+    * "visible"
+    * "prerender
+* Streams API  
+    Streams API 是为了解决一个简单但又基础的问题而生的：Web 应用如何消费有序的小信息块而不是大块信息？这种能力主要有两种应用场景。  
+    * 大块数据可能不会一次性都可用。网络请求的响应就是一个典型的例子。网络负载是以连续信
+    息包形式交付的，而流式处理可以让应用在数据一到达就能使用，而不必等到所有数据都加载
+    完毕。
+    * 大块数据可能需要分小部分处理。视频处理、数据压缩、图像编码和 JSON 解析都是可以分成小
+    部分进行处理，而不必等到所有数据都在内存中时再处理的例子。
+    * Stream API 定义了三种流。
+        * 可读流：可以通过某个公共接口读取数据块的流。数据在内部从底层源进入流，然后由消费者（consumer）进行处理。
+            * 可读流是对底层数据源的封装。底层数据源可以将数据填充到流中，允许消费者通过流的公共接口读取数据。
+        * 可写流：可以通过某个公共接口写入数据块的流。生产者（producer）将数据写入流，数据在内部传入底层数据槽（sink）。
+        * 转换流：由两种流组成，可写流用于接收数据（可写端），可读流用于输出数据（可读端）。这两个流之间是转换程序（transformer），可以根据需要检查和修改流内容。
+* 计时 API  
+    Performance 接口通过 JavaScript API 暴露了浏览器内部的度量指标，允许开发者直接访问这些信息并基于这些信息实现自己想要的功能。这个接口暴露在window.performance 对象上  
+    Performance 接口由多个 API 构成：  
+        * High Resolution Time API 
+        * Performance Timeline API 
+        * Navigation Timing API 
+        * User Timing API 
+        * Resource Timing API 
+        * Paint Timing API
+* Web 组件
+    * 模板html  <template id="bar">my dom</template>
+    * 模板脚本 
+    * 影子 DOM ：通过它可以将一个完整的 DOM 树作为节点添加到父 DOM 树。这样可以实现 DOM 封装，意味着 CSS 样式和 CSS 选择符可以限制在影子 DOM 子树而不是整个顶级 DOM 树中。
+        * 影子 DOM 是通过 attachShadow()方法创建并添加给有效 HTML 元素的。容纳影子 DOM 的元素被称为影子宿主（shadow host）。影子 DOM 的根节点被称为影子根（shadow root）。
+        * attachShadow()方法需要一个shadowRootInit 对象，返回影子DOM的实例。shadowRootInit对象必须包含一个 mode 属性，值为"open"或"closed"。对"open"影子 DOM的引用可以通过 shadowRoot属性在 HTML 元素上获得，而对"closed"影子 DOM 的引用无法这样获取
+            ```
+                document.body.innerHTML = ` 
+                <div id="foo"></div> 
+                <div id="bar"></div> 
+                `; 
+                const foo = document.querySelector('#foo'); 
+                const bar = document.querySelector('#bar'); 
+                const openShadowDOM = foo.attachShadow({ mode: 'open' }); 
+                const closedShadowDOM = bar.attachShadow({ mode: 'closed' }); 
+                console.log(openShadowDOM); // #shadow-root (open)
+                console.log(closedShadowDOM); // #shadow-root (closed)
+                console.log(foo.shadowRoot); // #shadow-root (open) 
+                console.log(bar.shadowRoot); // null
+            ```
+    *  自定义组件
+        ```
+            class FooElement extends HTMLElement { 
+                constructor() { 
+                    super(); 
+                    console.log('x-foo') 
+                    // this 引用 Web 组件节点
+                    this.attachShadow({ mode: 'open' }); 
+                    this.shadowRoot.innerHTML = ` 
+                        <p>I'm inside a custom element!</p> 
+                    `;
+                } 
+            } 
+                customElements.define('x-foo', FooElement); 
+                document.body.innerHTML = ` 
+                <x-foo></x-foo> 
+                <x-foo></x-foo> 
+                <x-foo></x-foo>      
+        ```
+* Web Cryptography API
+
+## 错误与调试
+* throw new refrenceError(‘123’)
+* JavaScript 调试器 debugger
+## 网络请求
+* XHR
+    ``` 
+    let xhr =  new XmlHttpRequest()
+    xhr.onreadystatechange(() =>{
+
+    })
+    xhr.open('get', url)
+    xhr.send()
+
+    ```
+* fetch
+    * fetch(url).then(res => res.text()).then(data =>{    })
+    * 发送 JSON 数据
+        ```
+        可以像下面这样发送简单 JSON 字符串：
+        let payload = JSON.stringify({ 
+            foo: 'bar' 
+        }); 
+        let jsonHeaders = new Headers({ 
+            'Content-Type': 'application/json' 
+        }); 
+        fetch('/send-me-json', { 
+            method: 'POST', // 发送请求体时必须使用一种 HTTP 方法
+            body: payload, 
+            headers: jsonHeaders 
+        });
+        ```
+    * 在请求体中发送参数
+        ```
+            let payload = 'foo=bar&baz=qux'; 
+            let paramHeaders = new Headers({ 
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' 
+            });
+            fetch('/send-me-params', { 
+                method: 'POST', // 发送请求体时必须使用一种 HTTP 方法
+                body: payload, 
+                headers: paramHeaders 
+            });
+        ```
+    * 发送文件
+        ```
+            let imageFormData = new FormData(); 
+            let imageInput = document.querySelector("input[type='file'][multiple]"); 
+                for (let i = 0; i < imageInput.files.length; ++i) { 
+                imageFormData.append('image', imageInput.files[i]); 
+            }
+            fetch('/img-upload', { 
+                method: 'POST', 
+                body: imageFormData 
+            });
+        ```
+    * 加载 Blob 文件
+        ```
+            const imageElement = document.querySelector('img'); 
+            fetch('my-image.png') 
+            .then((response) => response.blob()) 
+            .then((blob) => { 
+                imageElement.src = URL.createObjectURL(blob); 
+            });
+        ```
+    * 中断请求
+        ```
+            let abortController = new AbortController(); 
+            fetch('wikipedia.zip', { signal: abortController.signal }) 
+            .catch(() => console.log('aborted!'); 
+            // 10 毫秒后中断请求
+            setTimeout(() => abortController.abort(), 10); 
+            // 已经中断
+        ```
+    * 流式获取数据
+
+### 浏览器存储
+* cookie
+* web storage
+    * localstorage
+    * sessionstorage
+* indexedDB
+
+### 模块
+CommonJS  
+* CommonJS 规范概述了同步声明依赖的模块定义。这个规范主要用于在服务器端实现模块化代码组织，但也可用于定义在浏览器中使用的模块依赖。CommonJS 模块语法不能在浏览器中直接运行
+* CommonJS 模块定义需要使用 require()指定依赖，而使用 exports 对象定义自己的公共 API。
+* 无论一个模块在 require()中被引用多少次，模块永远是单例
+* 模块第一次加载后会被缓存，后续加载会取得缓存的模块 模块加载顺序由依赖图决定
+* 在 CommonJS 中，模块加载是模块系统执行的同步操作
+* CommonJS 依赖几个全局属性如 require 和 module.exports。如果想在浏览器中使用 CommonJS模块，就需要与其非原生的模块语法之间构筑“桥梁”。模块级代码与浏览器运行时之间也需要某种“屏障”，因为没有封装的CommonJS 代码在浏览器中执行会创建全局变量。这显然与模块模式的初衷相悖。常见的解决方案是提前把模块文件打包好，把全局属性转换为原生 JavaScript 结构，将模块代码封装在函数闭包中，最终只提供一个文件。为了以正确的顺序打包模块，需要事先生成全面的依赖图。
+
+#### ES6的  模块
+* <script type="module"> 所有模块都会像<script defer>加载的脚本一样按顺序执行
+* <script type="module">关联或者通过 import 语句加载的 JavaScript 文件会被认定为模块。
+* 模块行为
+    * 模块代码只在加载后执行。
+    * 模块只能加载一次。
+    * 模块是单例。
+    * 模块可以定义公共接口，其他模块可以基于这个公共接口观察和交互。
+    * 模块可以请求加载其他模块。
+    * 支持循环依赖。
+    * ES6 模块默认在严格模式下执行。
+    * ES6 模块不共享全局命名空间。
+    * 模块顶级 this 的值是 undefined（常规脚本中是 window）。
+    * 模块中的 var 声明不会添加到 window 对象。
+    * ES6 模块是异步加载和执行的。
+* 模块导出
+    ES6 模块支持两种导出：命名导出和默认导出
+    * export 关键字用于声明一个值为命名导出。导出语句必须在模块顶级，不能嵌套在某个块中
+    * export 语句与导出值的相对位置或者export 关键字在模块中出现的顺序没有限制
+        ```
+            const foo = 'foo'; 
+
+            // 等同于 export default foo;  默认导出
+            export { foo as default };
+            export { foo };   // 允许同时存在
+        ```
+* 模块导入
+    * import 必须出现在模块的顶级 不能嵌套在某个块中
+    * import 语句被提升到模块顶部
+    * 如果在浏览器中通过标识符原生加载模块，则文件必须带有.js 扩展名，不然可能无法正确解析。不过，如果是通过构建工具或第三方模块加载器打包或解析的 ES6 模块，则可能不需要包含文件扩展名
+    * 导入对模块而言是只读的，实际上相当于 const 声明的变量。在使用*执行批量导入时，赋值给别名的命名导出就好像使用 Object.freeze()冻结过一样。直接修改导出的值是不可能的，但可以修改导出对象的属性。同样，也不能给导出的集合添加或删除导出的属性。要修改导出的值，必须使用有内部变量和属性访问权限的导出方法
+        ```
+            import { foo, bar, baz as myBaz } from './foo.js';
+        ```
+* 模块转移导出
+    * 模块导入的值可以直接通过管道转移到导出
+    * export * from './foo.js';
+
+## 工作者线程
+
+* 允许把主线程的工作转嫁给独立的实体，而不会改变现有的单线程模型
+* JavaScript 环境实际上是运行在托管操作系统中的虚拟环境。在浏览器中每打开一个页面，就会分
+配一个它自己的环境。这样，每个页面都有自己的内存、事件循环、DOM，等等。每个页面就相当于
+一个沙盒，不会干扰其他页面。对于浏览器来说，同时管理多个环境是非常简单的，因为所有这些环境
+都是并行执行的。
+* 使用工作者线程，浏览器可以在原始页面环境之外再分配一个完全独立的二级子环境。这个子环境
+不能与依赖单线程交互的 API（如 DOM）互操作，但可以与父环境并行执行代码。
