@@ -2573,7 +2573,7 @@ writeln()、open()和 close()。其中，write()和 writeln()方法都接收一�
     * 实时表单验证
 
 
-* 小结
+* 小结  
 文档对象模型（DOM，Document Object Model）是语言中立的 HTML 和 XML 文档的 API。DOM Level 1 将 HTML 和 XML 文档定义为一个节点的多层级结构，并暴露出 JavaScript 接口以操作文档的底
 层结构和外观。  
 DOM 由一系列节点类型构成，主要包括以下几种。  
@@ -2593,3 +2593,165 @@ DOM 变化，而且 API 也相对简单。
 
 ## 事件
 
+JavaScript 与 HTML 的交互是通过事件实现的，事件代表文档或浏览器窗口中某个有意义的时刻。
+可以使用仅在事件发生时执行的监听器（也叫处理程序）订阅事件。在传统软件工程领域，这个模型叫
+“观察者模式”，其能够做到页面行为（在 JavaScript 中定义）与页面展示（在 HTML 和 CSS 中定义）的分离。
+
+### 事件流
+
+事件流描述了页面接收事件的顺序: 当你点击一个按钮时，实际上不光点击了这个按钮，还点击了它的容器以及整个页面
+
+* 事件冒泡和事件捕获
+    * 事件冒泡: 当点击一个按钮 事件会依次按照  Button > div > html > document 传递下去 在经过的每个节点上依次触发，直至到达 document 对象。
+    * 捕获与冒泡方向相反 基本不用
+* DOM 事件流
+    * DOM2 Events 规范规定事件流分为 3 个阶段：事件捕获、到达目标和事件冒泡
+* 事件处理程序（或事件监听器）
+    * DOM0： 单击（click）、加载（load）、鼠标悬停（mouseover） 等 ： click 事件的处理程序叫作 onclick，而 load 事件的处理程序叫作 onload
+    * DOM1： addEventListener(事件名、事件处理函数，布尔值)和 removeEventListener()
+        * 布尔值 true 表示在捕获阶段调用事件处理程序，false（默认值）表示在冒泡阶段调用事件处理程序
+### 事件对象 event
+* event 对象只在事件处理程序执行期间存在，一旦执行完毕，就会被销毁
+* 在 DOM 中发生事件时，所有相关信息都会被收集并存储在一个名为 event 的对象中。这个对象包
+含了一些基本信息，比如导致事件的元素、发生的事件类型，以及可能与特定事件相关的任何其他数据。
+例如，鼠标操作导致的事件会生成鼠标位置信息，而键盘操作导致的事件会生成与被按下的键有关的信
+息
+    * DOM 事件对象
+        ```
+        btn.onclick = function(event) { 
+            console.log(event.type); // "click" 
+        };
+        ```
+        * event.preventDefault()方法用于阻止特定事件的默认动作。比如，链接的默认行为就是在被单击时导航到 href 属性指定的 URL。如果想阻止这个导航行为，可以在 onclick 事件处理程序中取消
+### 事件类型
+
+* DOM3 Events 定义了如下事件类型。
+    * 用户界面事件（UIEvent）：涉及与 BOM 交互的通用浏览器事件。
+        * DOMActivate：元素被用户通过鼠标或键盘操作激活时触发（比 click 或 keydown 更通用）。这个事件在 DOM3 Events 中已经废弃。因为浏览器实现之间存在差异，所以不要使用它。
+        * load：在 window 上当页面加载完成后触发，在窗套（<frameset>）上当所有窗格（<frame>）
+        都加载完成后触发，在<img>元素上当图片加载完成后触发，在<object>元素上当相应对象加
+        载完成后触发。
+        * unload：在 window 上当页面完全卸载后触发，在窗套上当所有窗格都卸载完成后触发，在
+        <object>元素上当相应对象卸载完成后触发。
+        * abort：在<object>元素上当相应对象加载完成前被用户提前终止下载时触发。
+        * error：在 window 上当 JavaScript 报错时触发，在<img>元素上当无法加载指定图片时触发，
+        在<object>元素上当无法加载相应对象时触发，在窗套上当一个或多个窗格无法完成加载时
+        触发。
+        * select：在文本框（<input>或 textarea）上当用户选择了一个或多个字符时触发。
+        * resize：在 window 或窗格上当窗口或窗格被缩放时触发。
+        * scroll：当用户滚动包含滚动条的元素时在元素上触发。<body>元素包含已加载页面的滚动条。
+    * 焦点事件（FocusEvent）：在元素获得和失去焦点时触发。
+        * blur：当元素失去焦点时触发。这个事件不冒泡，所有浏览器都支持。
+        * DOMFocusIn：当元素获得焦点时触发。这个事件是 focus 的冒泡版。Opera 是唯一支持这个事件的主流浏览器。DOM3 Events 废弃了 DOMFocusIn，推荐 focusin。
+        * DOMFocusOut：当元素失去焦点时触发。这个事件是 blur 的通用版。Opera 是唯一支持这个事件的主流浏览器。DOM3 Events 废弃了 DOMFocusOut，推荐 focusout。
+        * focus：当元素获得焦点时触发。这个事件不冒泡，所有浏览器都支持。
+        * focusin：当元素获得焦点时触发。这个事件是 focus 的冒泡版。
+        * focusout：当元素失去焦点时触发。这个事件是 blur 的通用版。 
+
+        焦点事件中的两个主要事件是 focus 和 blur，这两个事件在 JavaScript 早期就得到了浏览器支持。它们最大的问题是不冒泡。这导致 IE后来又增加了 focusin 和 focusout，Opera又增加了 DOMFocusIn 和 DOMFocusOut。IE 新增的这两个事件已经被 DOM3 Events 标准化。  
+
+        当焦点从页面中的一个元素移到另一个元素上时，会依次发生如下事件。  
+            1. focuscout 在失去焦点的元素上触发。
+            2. focusin 在获得焦点的元素上触发。
+            3. blur 在失去焦点的元素上触发。
+            4. DOMFocusOut 在失去焦点的元素上触发。
+            5. focus 在获得焦点的元素上触发。
+            6. DOMFocusIn 在获得焦点的元素上触发。  
+        其中，blur、DOMFocusOut 和 focusout 的事件目标是失去焦点的元素，而 focus、DOMFocusIn和 focusin 的事件目标是获得焦点的元素。
+    * 鼠标事件（MouseEvent）：使用鼠标在页面上执行某些操作时触发。
+    * 滚轮事件（WheelEvent）：使用鼠标滚轮（或类似设备）时触发。
+    * 输入事件（InputEvent）：向文档中输入文本时触发。
+    * 键盘事件（KeyboardEvent）：使用键盘在页面上执行某些操作时触发。
+    * 合成事件（CompositionEvent）：在使用某种 IME（Input Method Editor，输入法编辑器）输入字符时触发。
+    * HTML5 事件
+        * contextmenu 事件 :上下文菜单
+        * beforeunload 事件:给开发者提供阻止页面被卸载的机会
+        * DOMContentLoaded 事件: window 的 load 事件会在页面完全加载后触发，因为要等待很多外部资源加载完成，所以会花费较长时间。而 DOMContentLoaded 事件会在 DOM 树构建完成后立即触发，而不用等待图片、JavaScript文件、CSS 文件或其他资源加载完成.相对于 load 事件，DOMContentLoaded 可以让开发者在外部资
+源下载的同时就能指定事件处理程序，从而让用户能够更快地与页面交互。
+        * readystatechange 事件  文档或元素加载状态的信息
+        * pageshow 与 pagehide 事件
+        * hashchange 事件:用于在 URL 散列值（URL 最后#后面的部分）发生变化时通知开发者
+    * 设备事件
+### 事件委托
+过多事件处理程序”的解决方案是使用事件委托。事件委托利用事件冒泡，可以只使用一个事件
+处理程序来管理一种类型的事件。例如，click 事件冒泡到 document。这意味着可以为整个页面指定
+一个 onclick 事件处理程序，而不用为每个可点击元素分别指定事件处理程序
+```
+<ul id="myLinks"> 
+ <li id="goSomewhere">Go somewhere</li> 
+ <li id="doSomething">Do something</li> 
+ <li id="sayHi">Say hi</li> 
+</ul> 
+这里的 HTML 包含 3 个列表项，在被点击时应该执行某个操作。对此，通常的做法是像这样指定 3
+个事件处理程序：
+let item1 = document.getElementById("goSomewhere"); 
+let item2 = document.getElementById("doSomething"); 
+let item3 = document.getElementById("sayHi"); 
+item1.addEventListener("click", (event) => { 
+    location.href = "http:// www.wrox.com"; 
+}); 
+item2.addEventListener("click", (event) => { 
+    document.title = "I changed the document's title"; 
+}); 
+item3.addEventListener("click", (event) => { 
+    console.log("hi"); 
+});
+
+改进后
+
+let list = document.getElementById("myLinks"); 
+list.addEventListener("click", (event) => { 
+    let target = event.target; 
+    switch(target.id) { 
+        case "doSomething": 
+            document.title = "I changed the document's title"; 
+            break; 
+        case "goSomewhere": 
+            location.href = "http:// www.wrox.com"; 
+            break; 
+        case "sayHi": 
+            console.log("hi"); 
+            break; 
+    } 
+});
+```
+### 模拟事件
+    * DOM 事件模拟
+        任何时候，都可以使用 document.createEvent()方法创建一个 event 对象。这个方法接收一个参数，此参数是一个表示要创建事件类型的字符串。在 DOM2 中，所有这些字符串都是英文复数形式，但在 DOM3 中，又把它们改成了英文单数形式。可用的字符串值是以下值之一。
+            * "UIEvents"（DOM3 中是"UIEvent"）：通用用户界面事件（鼠标事件和键盘事件都继承自这
+            个事件）。
+            * "MouseEvents"（DOM3 中是"MouseEvent"）：通用鼠标事件。
+            * "HTMLEvents"（DOM3 中没有）：通用 HTML 事件（HTML 事件已经分散到了其他事件大类中）。
+        注意，键盘事件不是在 DOM2 Events 中规定的，而是后来在 DOM3 Events 中增加的。  
+        创建 event 对象之后，需要使用事件相关的信息来初始化。每种类型的 event 对象都有特定的方法，可以使用相应数据来完成初始化。方法的名字并不相同，这取决于调用 createEvent()时传入的参数。  
+        事件模拟的最后一步是触发事件。为此要使用 dispatchEvent()方法，这个方法存在于所有支持事件的 DOM 节点之上。dispatchEvent()方法接收一个参数，即表示要触发事件的 event 对象。调用 dispatchEvent()方法之后，事件就“转正”了，接着便冒泡并触发事件处理程序执行
+        * 模拟鼠标
+            ```
+                let btn = document.getElementById("myBtn"); 
+                // 创建 event 对象
+                let event = document.createEvent("MouseEvents"); 
+                // 初始化 event 对象
+                event.initMouseEvent("click", true, true, document.defaultView, 
+                0, 0, 0, 0, 0, false, false, false, false, 0, null); 
+                // 触发事件
+                btn.dispatchEvent(event);
+            ```
+        * 模拟键盘 "KeyboardEvent"
+        * 模拟其他事件
+        * 自定义 DOM 事件
+            DOM3 增加了自定义事件的类型。自定义事件不会触发原生 DOM 事件，但可以让开发者定义自己的事件。
+### 小结  
+
+事件是 JavaScript 与网页结合的主要方式。最常见的事件是在 DOM3 Events 规范或 HTML5 中定义
+的。虽然基本的事件都有规范定义，但很多浏览器在规范之外实现了自己专有的事件，以方便开发者更
+好地满足用户交互需求，其中一些专有事件直接与特殊的设备相关。  
+围绕着使用事件，需要考虑内存与性能问题。例如：
+*  最好限制一个页面中事件处理程序的数量，因为它们会占用过多内存，导致页面响应缓慢；
+*  利用事件冒泡，事件委托可以解决限制事件处理程序数量的问题；
+*  最好在页面卸载之前删除所有事件处理程序。  
+使用 JavaScript 也可以在浏览器中模拟事件。DOM2 Events 和 DOM3 Events 规范提供了模拟方法，
+可以模拟所有原生 DOM 事件。键盘事件一定程度上也是可以模拟的，有时候需要组合其他技术。IE8
+及更早版本也支持事件模拟，只是接口与 DOM 方式不同。  
+事件是 JavaScript 中最重要的主题之一，理解事件的原理及其对性能的影响非常重要。
+
+## 动画与 Canvas 图形
